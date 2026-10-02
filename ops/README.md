@@ -59,11 +59,15 @@ These do not substitute for real encryption/upload/restore or hardware tests.
   against `/api/readyz` until the live host actually implements it.
   Deployment metadata reports no associated published deployment for this workspace;
   do not confuse that with the independently reachable public site being offline.
-- Development API already fails stored-key decryption with the current
-  `SESSION_SECRET`. The operator can access the original working environment.
-  Validate any source secret separately before replacing the current setting;
-  never generate a replacement, delete keysets, or bypass the check. A secret
-  mismatch is not yet distinguished from incompatible/corrupt development data.
+- Read-only validation of the supplied source secret decrypted all 12 development
+  keysets and reproduced all recorded keyset identities, including the active one.
+  The operator then replaced `SESSION_SECRET` through protected settings after
+  setting the workspace to standby. A second read-only audit verified that the
+  configured secret also decrypts and reproduces all 12 identities. No encrypted
+  admin configuration values were present to test.
+  The API now runs in standby: liveness returns 200; readiness and ledger routes
+  return 503; startup jobs are disabled. This fixes the workspace secret mismatch,
+  but does not establish complete production history or authorize activation.
 - Confirm exact SDK/CLI compatibility with 0.4.0.1.
   Runtime sources are supplied; there is **no installable or tested `.s9pk` yet**.
 - Confirm the distinct upstream API origin, DNS control,
