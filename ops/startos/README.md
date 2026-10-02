@@ -7,8 +7,13 @@ has been performed. No schema, live database, or secret was read/exported.
 Chosen architecture: Start9 primary API + PostgreSQL 16, Netlify static wallet
 and admin, encrypted Google Drive backups, manually activated Replit recovery.
 There is never automatic transaction failover. GitHub contains source, not state.
-32 GB RAM and approximately 1 TB free are reported; CPU/architecture, StartOS
-version, storage durability, network, and available headroom are unverified.
+The operator reports an Embassy Pro, StartOS 0.4.0.1, 32 GB RAM and approximately
+1 TB free. Start9's official hardware reference identifies the Embassy Pro
+(later Server Pro / Server Pure 2023) as an Intel Core i7-10510U, x86_64 machine:
+https://docs.start9.com/start-os/0.4.0.x/start9-hardware.html
+Target external builds at linux/amd64. This identifies the model's architecture;
+it does not verify this unit's installed OS, SDK compatibility, storage durability,
+network reachability, or available headroom.
 
 ## Official packaging research and compatibility gate
 

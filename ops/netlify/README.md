@@ -1,5 +1,11 @@
 # Static Netlify frontend, Start9 transaction service
 
+The operator confirmed `lekmint.cash` as the existing public wallet address.
+Preserve `https://lekmint.cash` and mint identity `https://lekmint.cash/api`;
+set `PUBLIC_CANONICAL_ORIGIN=https://lekmint.cash` when preparing Netlify.
+The distinct Start9 upstream has not been supplied or provisioned. Do not use
+the public wallet origin as `START9_API_ORIGIN`, which would create a proxy loop.
+
 This prepares a combined static site only: the existing wallet at `/`, admin at
 `/admin/`, and same-origin `/api` requests proxied to Start9. It does not deploy,
 create a Netlify site, change DNS, or run the ledger. Replit's existing builds and

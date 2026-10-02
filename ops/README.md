@@ -50,12 +50,23 @@ These do not substitute for real encryption/upload/restore or hardware tests.
 
 ## Activation blockers
 
+- Operator confirmed Embassy Pro hardware and `lekmint.cash` as the public wallet
+  address. Official Start9 documentation identifies that model as x86_64.
+  Preserve `https://lekmint.cash`; the distinct Start9 HTTPS upstream is still pending.
+- A read-only public check on 2026-10-01 (America/Chicago) returned HTTP 200,
+  `{"status":"ok","version":"1.1.1"}` at `/api/healthz`, and HTTP 404 at `/api/readyz`.
+  Liveness is not proof of transaction readiness. Do not enable the new monitor
+  against `/api/readyz` until the live host actually implements it.
+  Deployment metadata reports no associated published deployment for this workspace;
+  do not confuse that with the independently reachable public site being offline.
 - Development API already fails stored-key decryption with the current
-  `SESSION_SECRET`. Restore the original matching secret through protected
-  settings; never generate a replacement, delete keysets, or bypass the check.
-- Confirm Start9 CPU architecture and exact SDK/CLI compatibility with 0.4.0.1.
+  `SESSION_SECRET`. The operator can access the original working environment.
+  Validate any source secret separately before replacing the current setting;
+  never generate a replacement, delete keysets, or bypass the check. A secret
+  mismatch is not yet distinguished from incompatible/corrupt development data.
+- Confirm exact SDK/CLI compatibility with 0.4.0.1.
   Runtime sources are supplied; there is **no installable or tested `.s9pk` yet**.
-- Confirm the existing production wallet origin, public API origin, DNS control,
+- Confirm the distinct upstream API origin, DNS control,
   Netlify access and actual production database. Do not infer them from dev URLs.
 - Configure separate off-site email secrets, monitor state issue and opt-in
   activation. Alerts to `info@lekmint.cash` are not live until exercised.
