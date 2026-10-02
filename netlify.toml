@@ -1,0 +1,20 @@
+[build]
+  command = "node --test ops/netlify/build.test.mjs && node ops/netlify/build.mjs"
+  publish = "ops/netlify/dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+# Routing (including the API proxy) is generated only after origin validation.
+# Do not add a catch-all redirect here: it could swallow upstream API errors.
+[[headers]]
+  for = "/api/*"
+  [headers.values]
+    Cache-Control = "no-store"
+    X-Content-Type-Options = "nosniff"
+
+[[headers]]
+  for = "/api"
+  [headers.values]
+    Cache-Control = "no-store"
+    X-Content-Type-Options = "nosniff"

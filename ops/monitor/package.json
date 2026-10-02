@@ -1,0 +1,12 @@
+{
+  "name": "lek-mint-outage-monitor",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test monitor.test.mjs",
+    "monitor": "node run.mjs"
+  },
+  "dependencies": {
+    "nodemailer": "9.0.5"
+  }
+}

@@ -1,0 +1,9 @@
+# SOURCE ONLY: separate one-shot tools image; no credentials in build context.
+ARG POSTGRES_IMAGE=postgres:16-bookworm
+FROM ${POSTGRES_IMAGE}
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    age rclone jq bash coreutils util-linux ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+COPY ops/backup/common.sh ops/backup/backup.sh ops/backup/restore.sh /opt/lek-backup/
+USER postgres
+ENTRYPOINT ["/bin/bash", "/opt/lek-backup/backup.sh"]
