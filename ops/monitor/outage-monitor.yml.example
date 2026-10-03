@@ -1,0 +1,42 @@
+name: Lek Mint outage monitor
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: lek-mint-outage-monitor
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    if: ${{ vars.MINT_MONITOR_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install standalone monitor dependencies
+        run: npm install --prefix ops/monitor --ignore-scripts --no-package-lock --no-audit --no-fund
+      - name: Check readiness and send queued notifications
+        run: node ops/monitor/run.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          MINT_MONITOR_URL: ${{ secrets.MINT_MONITOR_URL }}
+          MINT_MONITOR_STATE_ISSUE: ${{ vars.MINT_MONITOR_STATE_ISSUE }}
+          MAILGUN_SMTP_USER: ${{ secrets.MAILGUN_SMTP_USER }}
+          MAILGUN_SMTP_PASS: ${{ secrets.MAILGUN_SMTP_PASS }}
+          MINT_MONITOR_SMTP_HOST: ${{ vars.MINT_MONITOR_SMTP_HOST }}
+          MINT_MONITOR_SMTP_PORT: ${{ vars.MINT_MONITOR_SMTP_PORT }}
+          MINT_MONITOR_FROM: ${{ vars.MINT_MONITOR_FROM }}
+          MINT_MONITOR_TO: ${{ vars.MINT_MONITOR_TO }}

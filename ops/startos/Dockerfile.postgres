@@ -1,0 +1,10 @@
+# SOURCE ONLY. Never mount SQL into /docker-entrypoint-initdb.d.
+# postgres-entrypoint refuses to initialize PGDATA on normal startup.
+ARG POSTGRES_IMAGE=postgres:16-bookworm
+FROM ${POSTGRES_IMAGE}
+ENV PGDATA=/var/lib/postgresql/data/pgdata
+COPY ops/startos/postgres-entrypoint.sh /usr/local/bin/lek-postgres-entrypoint
+STOPSIGNAL SIGINT
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD ["pg_isready", "-h", "127.0.0.1", "-p", "5432"]
+ENTRYPOINT ["/bin/sh", "/usr/local/bin/lek-postgres-entrypoint"]
+CMD ["postgres", "-c", "listen_addresses=127.0.0.1", "-c", "password_encryption=scram-sha-256", "-c", "fsync=on", "-c", "full_page_writes=on", "-c", "synchronous_commit=on"]

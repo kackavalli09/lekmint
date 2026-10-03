@@ -1,0 +1,2080 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 1.1.1
+  description: Lek Mint API — on-chain BTC backed Cashu ecash mint (unit lek)
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: mint
+    description: Minting lek from on-chain BTC deposits
+  - name: token
+    description: Token operations (redeem, swap, upgrade)
+  - name: tokenomics
+    description: Public keys, keysets, and epoch registry
+  - name: admin
+    description: Operator-only endpoints
+paths:
+  /readyz:
+    get:
+      operationId: readinessCheck
+      tags: [health]
+      summary: Transaction service readiness
+      description: Uncached operational readiness; passive or draining hosts return 503 without querying the ledger.
+      responses:
+        "200":
+          description: Active process initialized and database reachable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MintReadiness"
+        "503":
+          description: Standby, maintenance, initializing, draining, or database unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MintReadiness"
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+  /mint/request:
+    post:
+      operationId: createMintRequest
+      tags: [mint]
+      summary: Request a fresh BTC deposit address to mint lek
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MintRequestInput"
+      responses:
+        "201":
+          description: Mint request created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MintRequestStatus"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "503":
+          description: Mint not configured (no xpub set)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /mint/status/{id}:
+    get:
+      operationId: getMintRequestStatus
+      tags: [mint]
+      summary: Poll a mint request for deposit confirmation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Current status of the mint request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MintRequestStatus"
+        "404":
+          description: Mint request not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /mint/issue:
+    post:
+      operationId: issueTokens
+      tags: [mint]
+      summary: Issue blind signatures for a confirmed mint request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IssueTokensInput"
+      responses:
+        "200":
+          description: Blind signatures issued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SignaturesResponse"
+        "400":
+          description: Invalid outputs (amount mismatch or malformed)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "404":
+          description: Mint request not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "409":
+          description: Mint request not confirmed or already issued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /mint/recover:
+    post:
+      operationId: recoverTokens
+      tags: [mint]
+      summary: Recover issuance for a BTC address if proofs were never delivered
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecoverTokensInput"
+      responses:
+        "200":
+          description: Recovery result with the mint request state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecoveryResult"
+        "400":
+          description: Invalid BTC address
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "404":
+          description: No mint request found for this address
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /mint/upgrade:
+    post:
+      operationId: upgradeTokens
+      tags: [token]
+      summary: Swap proofs of any vintage into current-epoch proofs (yield capture)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpgradeTokensInput"
+      responses:
+        "200":
+          description: New signatures at the current epoch rate
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UpgradeResult"
+        "400":
+          description: Invalid proofs or outputs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "409":
+          description: One or more proofs already spent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /redeem:
+    post:
+      operationId: redeemTokens
+      tags: [token]
+      summary: Redeem proofs (marks them spent)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RedeemTokensInput"
+      responses:
+        "200":
+          description: Proofs redeemed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RedeemResult"
+        "400":
+          description: Invalid proofs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "409":
+          description: One or more proofs already spent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /melt/quote:
+    get:
+      operationId: getMeltQuote
+      tags: [token]
+      summary: Estimate the BTC amount for melting a given lek amount (current epoch rate, expected transfer fees)
+      parameters:
+        - name: amountLeks
+          in: query
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 2100000000000000
+      responses:
+        "200":
+          description: BTC estimate at the current epoch rate — final amount is recalculated when the payout batch is prepared
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeltQuote"
+        "503":
+          description: Mint not initialized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /swap:
+    post:
+      operationId: swapTokens
+      tags: [token]
+      summary: Swap proofs for new blind signatures (denomination change)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SwapTokensInput"
+      responses:
+        "200":
+          description: New blind signatures
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SignaturesResponse"
+        "400":
+          description: Invalid inputs/outputs or amount mismatch
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "409":
+          description: One or more proofs already spent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /escrow/check:
+    post:
+      operationId: checkEscrow
+      tags: [token]
+      summary: Check whether a spent token has an unclaimed appreciation escrow
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EscrowCheckInput"
+      responses:
+        "200":
+          description: Escrow status for the presented proof set
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EscrowCheckResult"
+        "400":
+          description: Invalid proofs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /escrow/claim:
+    post:
+      operationId: claimEscrow
+      tags: [token]
+      summary: Claim an appreciation escrow by presenting the original (spent) proofs
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EscrowClaimInput"
+      responses:
+        "200":
+          description: Escrow claimed; new blind signatures issued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EscrowClaimResult"
+        "400":
+          description: Invalid proofs or output total mismatch
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "409":
+          description: No unclaimed escrow for this proof set
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /swap/recover:
+    post:
+      operationId: recoverSwap
+      tags: [token]
+      summary: Redeliver blind signatures for an already-processed swap/upgrade
+      description: >-
+        Idempotent crash recovery. Looks up the blinded messages (B_) of a
+        previously processed swap or upgrade and returns the exact blind
+        signatures that were issued for them. Returns null for any B_ the
+        mint has never signed (the original operation never committed, so the
+        original proofs are still spendable).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SwapRecoverInput"
+      responses:
+        "200":
+          description: Signatures aligned with the requested B_ order (null when unknown)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SwapRecoveryResult"
+  /keys:
+    get:
+      operationId: getActiveKeys
+      tags: [tokenomics]
+      summary: Get the active keyset public keys
+      responses:
+        "200":
+          description: Active keyset
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KeysResponse"
+  /keysets:
+    get:
+      operationId: getKeysets
+      tags: [tokenomics]
+      summary: List all keysets (active, historical, and revoked — revoked ones are marked and their proofs are permanently invalid)
+      responses:
+        "200":
+          description: All keysets
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KeysetsResponse"
+  /epochs:
+    get:
+      operationId: getEpochs
+      tags: [tokenomics]
+      summary: Public epoch registry (difficulty-pegged rate index history)
+      responses:
+        "200":
+          description: Epoch history and current rate
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EpochsResponse"
+  /admin/stats:
+    get:
+      operationId: getAdminStats
+      tags: [admin]
+      summary: Mint statistics for the operator dashboard
+      security:
+        - AdminKey: []
+      responses:
+        "200":
+          description: Aggregate statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminStats"
+        "401":
+          description: Missing admin credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /admin/fee-config:
+    get:
+      operationId: getFeeConfig
+      tags: [admin]
+      summary: Get current fee configuration
+      security:
+        - AdminKey: []
+      responses:
+        "200":
+          description: Current fee configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeeConfig"
+        "401":
+          description: Missing admin credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+    put:
+      operationId: updateFeeConfig
+      tags: [admin]
+      summary: Update fee configuration
+      security:
+        - AdminKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FeeConfigInput"
+      responses:
+        "200":
+          description: Updated fee configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeeConfig"
+        "400":
+          description: Invalid values
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "401":
+          description: Missing admin credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /admin/xpub:
+    put:
+      operationId: updateXpub
+      tags: [admin]
+      summary: Set the fund wallet xpub (stored encrypted)
+      security:
+        - AdminKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/XpubInput"
+      responses:
+        "200":
+          description: xpub accepted; sample addresses returned for verification
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/XpubUpdateResult"
+        "400":
+          description: Invalid xpub
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "401":
+          description: Missing admin credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /social-links:
+    get:
+      operationId: getSocialLinks
+      tags: [public]
+      summary: Get the mint's public social and contact links
+      responses:
+        "200":
+          description: Social links (nulls when not configured)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SocialLinks"
+  /admin/social-links:
+    put:
+      operationId: updateSocialLinks
+      tags: [admin]
+      summary: Set the mint's public social and contact links
+      security:
+        - AdminKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SocialLinks"
+      responses:
+        "200":
+          description: Updated social links
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SocialLinks"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "401":
+          description: Missing admin credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /admin/mint-settings:
+    get:
+      operationId: getMintSettings
+      tags: [admin]
+      summary: Get operational mint settings
+      security:
+        - AdminKey: []
+      responses:
+        "200":
+          description: Current mint settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MintSettings"
+        "401":
+          description: Missing admin credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+    put:
+      operationId: updateMintSettings
+      tags: [admin]
+      summary: Update operational mint settings (e.g. min confirmations)
+      security:
+        - AdminKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MintSettingsInput"
+      responses:
+        "200":
+          description: Updated mint settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MintSettings"
+        "400":
+          description: Invalid values
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "401":
+          description: Missing admin credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /admin/email-settings:
+    get:
+      operationId: getEmailSettings
+      tags: [admin]
+      summary: Get outbound email (Mailgun SMTP) settings — password never returned
+      security:
+        - AdminKey: []
+      responses:
+        "200":
+          description: Current email settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailSettings"
+        "401":
+          description: Missing admin credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+    put:
+      operationId: updateEmailSettings
+      tags: [admin]
+      summary: Update outbound email settings (omit smtpPass to leave unchanged, empty string clears it)
+      security:
+        - AdminKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmailSettingsInput"
+      responses:
+        "200":
+          description: Updated email settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailSettings"
+        "400":
+          description: Invalid values
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "401":
+          description: Missing admin credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /admin/test-email:
+    post:
+      operationId: sendTestEmail
+      tags: [admin]
+      summary: Send a test email to the configured operator address
+      security:
+        - AdminKey: []
+      responses:
+        "200":
+          description: Test email accepted by the SMTP relay
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TestEmailResult"
+        "401":
+          description: Missing admin credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "502":
+          description: SMTP relay rejected the message
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "503":
+          description: Email is not configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /admin/keysets:
+    get:
+      operationId: getAdminKeysets
+      tags: [admin]
+      summary: List all keysets including revoked ones (rotation history)
+      security:
+        - AdminKey: []
+      responses:
+        "200":
+          description: All keysets with revocation state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminKeysetList"
+        "401":
+          description: Missing admin credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /admin/rotate-keyset:
+    post:
+      operationId: rotateKeyset
+      tags: [admin]
+      summary: "Security rotation: issue fresh keys and permanently void ALL tokens signed by current keys"
+      security:
+        - AdminKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RotateKeysetInput"
+      responses:
+        "200":
+          description: Rotation completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RotateKeysetResult"
+        "400":
+          description: Confirmation phrase missing or wrong
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "401":
+          description: Missing admin credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "503":
+          description: Mint not initialized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /admin/rebase-supply-era:
+    post:
+      operationId: rebaseSupplyEra
+      tags: [admin]
+      summary: "One-time idempotent correction: rebase post-rotation supply snapshots so the era starts at zero"
+      security:
+        - AdminKey: []
+      responses:
+        "200":
+          description: Correction applied (or nothing to do)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RebaseSupplyEraResult"
+        "401":
+          description: Missing admin credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /admin/restore-supply-btc-balance:
+    post:
+      operationId: restoreSupplyBtcBalance
+      tags: [admin]
+      summary: "Recovery: correct btcBalanceSats in era supply rows that were incorrectly shifted by a past buggy rebase"
+      security:
+        - AdminKey: []
+      responses:
+        "200":
+          description: Correction applied (or already correct)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RebaseSupplyEraResult"
+        "401":
+          description: Missing admin credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /admin/supply:
+    get:
+      operationId: getSupplyLog
+      tags: [admin]
+      summary: Supply audit log (leks outstanding vs BTC held over time)
+      security:
+        - AdminKey: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 100
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        "200":
+          description: Supply snapshots, newest first
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SupplyLogResponse"
+        "401":
+          description: Missing admin credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /admin/escrows:
+    get:
+      operationId: getEscrowSummary
+      tags: [admin]
+      summary: Appreciation-escrow totals (from face-value swaps by external wallets)
+      security:
+        - AdminKey: []
+      responses:
+        "200":
+          description: Escrow totals
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EscrowSummary"
+        "401":
+          description: Missing admin credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /admin/escrows/list:
+    get:
+      operationId: listEscrows
+      tags: [admin]
+      summary: List individual appreciation escrows (most recent first)
+      security:
+        - AdminKey: []
+      responses:
+        "200":
+          description: Escrow rows
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EscrowListResult"
+        "401":
+          description: Missing admin credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /admin/escrows/{id}/release:
+    post:
+      operationId: releaseEscrow
+      tags: [admin]
+      summary: Release an unclaimed escrow to the operator as a spendable token
+      security:
+        - AdminKey: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Escrow released; token issued to the operator
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EscrowReleaseResult"
+        "401":
+          description: Missing admin credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "409":
+          description: Escrow not found or already claimed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /admin/payouts:
+    get:
+      operationId: getPayouts
+      tags: [admin]
+      summary: Payout queue for melted leks (pending and paid records)
+      security:
+        - AdminKey: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [pending, paid]
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 100
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        "200":
+          description: Payout records, newest first, with pending totals
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PayoutsResponse"
+        "401":
+          description: Missing admin credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /admin/payouts/mark-paid:
+    post:
+      operationId: markPayoutsPaid
+      tags: [admin]
+      summary: Mark a batch of pending payouts as paid
+      security:
+        - AdminKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PayoutSettleInput"
+      responses:
+        "200":
+          description: Number of payouts settled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PayoutSettleResult"
+        "400":
+          description: No matching pending payouts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "401":
+          description: Missing admin credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /admin/payouts/{id}/correct:
+    post:
+      operationId: correctPayoutPaidAmount
+      tags: [admin]
+      summary: Set a settled payout's actual paid sats (clears the estimate flag)
+      security:
+        - AdminKey: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PayoutCorrectionInput"
+      responses:
+        "200":
+          description: Corrected payout value
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PayoutCorrectionResult"
+        "400":
+          description: Invalid id or amount
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "401":
+          description: Missing admin credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "409":
+          description: Payout not found or not settled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+components:
+  securitySchemes:
+    AdminKey:
+      type: http
+      scheme: bearer
+      description: Operator API key
+  schemas:
+    MintReadiness:
+      type: object
+      required: [status, mode, release]
+      properties:
+        status:
+          type: string
+          enum: [ready, not_ready]
+        mode:
+          type: string
+          enum: [active, standby, maintenance]
+        release:
+          type: string
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+        version:
+          type: string
+      required:
+        - status
+    ApiError:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+    Proof:
+      type: object
+      description: A Cashu proof (bearer token component) held by the client
+      properties:
+        id:
+          type: string
+          description: Keyset id the proof belongs to
+        amount:
+          type: integer
+          description: Denomination in leks
+        secret:
+          type: string
+          description: The proof secret (utf-8 string)
+        C:
+          type: string
+          description: Unblinded signature point (hex)
+        r:
+          type: string
+          description: >-
+            Optional DLEQ blinding factor (hex) carried by tokens from
+            NUT-12-capable wallets. Lets the mint recompute the blinded point
+            B_ = Y + r*G and match this proof to the swap that issued it, so
+            appreciation escrowed at that swap can be claimed by the holder
+            of the resulting token.
+      required: [id, amount, secret, C]
+    BlindedMessage:
+      type: object
+      description: A blinded output the client asks the mint to sign
+      properties:
+        id:
+          type: string
+          description: Target keyset id
+        amount:
+          type: integer
+          description: Denomination in leks
+        B_:
+          type: string
+          description: Blinded point (hex)
+      required: [id, amount, B_]
+    BlindSignature:
+      type: object
+      description: The mint's blind signature over a blinded message
+      properties:
+        id:
+          type: string
+        amount:
+          type: integer
+        C_:
+          type: string
+          description: Blind signature point (hex)
+        dleq:
+          type: object
+          nullable: true
+          description: NUT-12 DLEQ proof that the mint signed with the published key
+          properties:
+            e:
+              type: string
+            s:
+              type: string
+          required: [e, s]
+      required: [id, amount, C_]
+    MintRequestInput:
+      type: object
+      properties:
+        amountSats:
+          type: integer
+          minimum: 1
+          description: Optional expected deposit amount in sats
+      required: []
+    MintRequestStatus:
+      type: object
+      properties:
+        id:
+          type: string
+        btcAddress:
+          type: string
+        status:
+          type: string
+          enum: [pending, payment_detected, confirmed, issued, expired, failed]
+        unit:
+          type: string
+          description: Always "lek"
+        requestedAmountSats:
+          type: integer
+          nullable: true
+        grossAmountSats:
+          type: integer
+          nullable: true
+        feeSats:
+          type: integer
+          nullable: true
+        netAmountSats:
+          type: integer
+          nullable: true
+        expectedLeks:
+          type: integer
+          nullable: true
+          description: Leks issuance will mint for the net sats at the current epoch rate — outputs must total exactly this.
+        confirmations:
+          type: integer
+          nullable: true
+        minConfirmations:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, btcAddress, status, unit, minConfirmations, createdAt]
+    IssueTokensInput:
+      type: object
+      properties:
+        requestId:
+          type: string
+        outputs:
+          type: array
+          items:
+            $ref: "#/components/schemas/BlindedMessage"
+          minItems: 1
+      required: [requestId, outputs]
+    SignaturesResponse:
+      type: object
+      properties:
+        unit:
+          type: string
+          description: Always "lek"
+        signatures:
+          type: array
+          items:
+            $ref: "#/components/schemas/BlindSignature"
+      required: [unit, signatures]
+    RecoverTokensInput:
+      type: object
+      properties:
+        btcAddress:
+          type: string
+          description: The derived deposit address the user sent BTC to
+      required: [btcAddress]
+    RecoveryResult:
+      type: object
+      properties:
+        request:
+          $ref: "#/components/schemas/MintRequestStatus"
+        signatures:
+          type: array
+          nullable: true
+          description: Previously issued blind signatures, if re-deliverable
+          items:
+            $ref: "#/components/schemas/BlindSignature"
+      required: [request]
+    UpgradeTokensInput:
+      type: object
+      properties:
+        proofs:
+          type: array
+          items:
+            $ref: "#/components/schemas/Proof"
+          minItems: 1
+        outputs:
+          type: array
+          description: Blinded outputs in the current epoch keyset totaling the upgraded value
+          items:
+            $ref: "#/components/schemas/BlindedMessage"
+          minItems: 1
+      required: [proofs, outputs]
+    UpgradeResult:
+      type: object
+      properties:
+        unit:
+          type: string
+        oldValue:
+          type: integer
+          description: Total input value in leks
+        newValue:
+          type: integer
+          description: Total upgraded value in leks (floor applied)
+        rateIndex:
+          type: string
+          description: Current epoch rate index applied (decimal string)
+        signatures:
+          type: array
+          items:
+            $ref: "#/components/schemas/BlindSignature"
+      required: [unit, oldValue, newValue, rateIndex, signatures]
+    RedeemTokensInput:
+      type: object
+      properties:
+        proofs:
+          type: array
+          items:
+            $ref: "#/components/schemas/Proof"
+          minItems: 1
+        btcAddress:
+          type: string
+          minLength: 14
+          maxLength: 90
+          description: Mainnet BTC address to receive the payout (settled later in operator batches)
+      required: [proofs, btcAddress]
+    RedeemResult:
+      type: object
+      properties:
+        unit:
+          type: string
+        redeemedAmount:
+          type: integer
+      required: [unit, redeemedAmount]
+    MeltQuote:
+      type: object
+      description: >-
+        Estimate of the BTC payout for melting leks, computed with the same
+        formula the operator payout queue uses. All figures are recalculated
+        from the epoch rate index and fee schedule in force when the payout
+        batch is prepared, so this is an estimate, never a guarantee.
+      properties:
+        unit:
+          type: string
+        amountLeks:
+          type: integer
+        rateIndex:
+          type: string
+          description: Current epoch rate index used for this estimate (decimal string)
+        estimatedGrossSats:
+          type: integer
+          description: floor(amountLeks / rateIndex) in sats, before transfer fees
+        estimatedFeeSats:
+          type: integer
+          description: Melt fee in sats under the current fee schedule (deducted)
+        estimatedNetworkFeeSats:
+          type: integer
+          description: Estimated BTC network transfer fee in sats (deducted, separate from the melt fee)
+        estimatedNetSats:
+          type: integer
+          description: Estimated BTC amount to be received, in sats — max(0, gross − melt fee − network fee)
+        quotedAt:
+          type: string
+          format: date-time
+        networkFee:
+          $ref: "#/components/schemas/NetworkFeeInfo"
+      required: [unit, amountLeks, rateIndex, estimatedGrossSats, estimatedFeeSats, estimatedNetworkFeeSats, estimatedNetSats, quotedAt, networkFee]
+    NetworkFeeInfo:
+      type: object
+      description: >-
+        The BTC network transfer fee deducted from the payout, separate from
+        the melt fee. Source "live" means a real-time mempool.space fee rate;
+        "fallback" means the live source was unavailable and a deterministic
+        fallback rate is used. Subject to change until the payout batch
+        settles.
+      properties:
+        source:
+          type: string
+          enum: [live, fallback]
+        estimatedSats:
+          type: integer
+          description: Estimated network transfer fee in sats (deducted from the payout)
+        satPerVb:
+          type: integer
+          description: Fee rate (sat/vB) behind the estimate
+      required: [source, estimatedSats, satPerVb]
+    SwapTokensInput:
+      type: object
+      properties:
+        inputs:
+          type: array
+          items:
+            $ref: "#/components/schemas/Proof"
+          minItems: 1
+        outputs:
+          type: array
+          items:
+            $ref: "#/components/schemas/BlindedMessage"
+          minItems: 1
+      required: [inputs, outputs]
+    EscrowCheckInput:
+      type: object
+      properties:
+        proofs:
+          type: array
+          items:
+            $ref: "#/components/schemas/Proof"
+          minItems: 1
+      required: [proofs]
+    EscrowCheckResult:
+      type: object
+      properties:
+        available:
+          type: boolean
+          description: True when calling /escrow/claim for this proof set will succeed
+        amountLeks:
+          type: integer
+          description: Claimable leks (0 when not available)
+        redeliverable:
+          type: boolean
+          description: >-
+            True when the escrow was already claimed and a claim would only
+            REDELIVER the original signatures — usable solely by the browser
+            that made the original claim (it holds the blindings). No new
+            value is ever issued for a redelivery.
+      required: [available, amountLeks]
+    EscrowClaimInput:
+      type: object
+      properties:
+        proofs:
+          type: array
+          description: The complete original (now spent) proofs the escrow was recorded against
+          items:
+            $ref: "#/components/schemas/Proof"
+          minItems: 1
+        outputs:
+          type: array
+          description: Blinded outputs in the active keyset totaling exactly the escrowed amount
+          items:
+            $ref: "#/components/schemas/BlindedMessage"
+          minItems: 1
+      required: [proofs, outputs]
+    EscrowClaimResult:
+      type: object
+      properties:
+        unit:
+          type: string
+        amountLeks:
+          type: integer
+        signatures:
+          type: array
+          items:
+            $ref: "#/components/schemas/BlindSignature"
+        redelivered:
+          type: boolean
+          description: >-
+            True when this escrow was already claimed and the ORIGINAL
+            signatures are being redelivered (crash recovery). In that case
+            `outputs` echoes the original blinded outputs so the wallet can
+            match its saved blindings; the request's own outputs are ignored.
+        outputs:
+          type: array
+          description: Original blinded outputs (present only when redelivered)
+          items:
+            $ref: "#/components/schemas/BlindedMessage"
+      required: [unit, amountLeks, signatures]
+    EscrowSummary:
+      type: object
+      properties:
+        unclaimedCount:
+          type: integer
+        unclaimedTotalLeks:
+          type: integer
+        claimedCount:
+          type: integer
+        claimedTotalLeks:
+          type: integer
+      required: [unclaimedCount, unclaimedTotalLeks, claimedCount, claimedTotalLeks]
+    EscrowRecord:
+      type: object
+      properties:
+        id:
+          type: integer
+        amountLeks:
+          type: integer
+        faceTotal:
+          type: integer
+        convertedValue:
+          type: integer
+        createdAt:
+          type: string
+        claimedAt:
+          type: string
+          nullable: true
+        releasedToken:
+          type: string
+          nullable: true
+          description: >-
+            Present when this escrow was released by the operator — the token
+            string issued at release time, redisplayed so it is never lost.
+        claimable:
+          type: boolean
+          description: Whether the escrow can still be claimed or released
+      required: [id, amountLeks, faceTotal, convertedValue, createdAt, claimable]
+    EscrowListResult:
+      type: object
+      properties:
+        escrows:
+          type: array
+          items:
+            $ref: "#/components/schemas/EscrowRecord"
+      required: [escrows]
+    EscrowReleaseResult:
+      type: object
+      properties:
+        unit:
+          type: string
+        amountLeks:
+          type: integer
+        token:
+          type: string
+          description: A spendable lek token for the escrowed amount — paste into the site wallet
+      required: [unit, amountLeks, token]
+    KeysResponse:
+      type: object
+      properties:
+        keysetId:
+          type: string
+        unit:
+          type: string
+        keys:
+          type: object
+          description: Map of denomination (leks) to public key (hex)
+          additionalProperties:
+            type: string
+      required: [keysetId, unit, keys]
+    Keyset:
+      type: object
+      properties:
+        id:
+          type: string
+        unit:
+          type: string
+        active:
+          type: boolean
+        epochId:
+          type: integer
+        revoked:
+          type: boolean
+          description: True if this keyset was revoked by a security rotation — its proofs are permanently invalid (unlike plain inactive historical keysets, which remain redeemable)
+      required: [id, unit, active, epochId, revoked]
+    KeysetsResponse:
+      type: object
+      properties:
+        keysets:
+          type: array
+          items:
+            $ref: "#/components/schemas/Keyset"
+      required: [keysets]
+    Epoch:
+      type: object
+      properties:
+        id:
+          type: integer
+        keysetId:
+          type: string
+        rateIndex:
+          type: string
+          description: High-precision decimal string, e.g. "1.000000000000"
+        difficulty:
+          type: string
+          description: Bitcoin network difficulty at epoch start (decimal string)
+        subsidySats:
+          type: integer
+        startedAt:
+          type: string
+          format: date-time
+      required: [id, keysetId, rateIndex, difficulty, subsidySats, startedAt]
+    EpochsResponse:
+      type: object
+      properties:
+        unit:
+          type: string
+        currentEpochId:
+          type: integer
+          nullable: true
+        currentRateIndex:
+          type: string
+          nullable: true
+        genesisCalibration:
+          type: string
+          nullable: true
+          description: C_0 as a decimal string
+        epochs:
+          type: array
+          items:
+            $ref: "#/components/schemas/Epoch"
+      required: [unit, epochs]
+    AdminStats:
+      type: object
+      properties:
+        fundedAddresses:
+          type: integer
+          description: Distinct funded deposit addresses (not unique users)
+        mintCount:
+          type: integer
+          description: Number of credited deposits (confirmed or issued)
+        totalBtcGrossSats:
+          type: integer
+          description: Gross sats received across credited deposits
+        totalBtcNetSats:
+          type: integer
+          description: Net credited deposit sats (gross minus mint fees)
+        totalFeesCollectedSats:
+          type: integer
+        btcHeldNetSats:
+          type: integer
+          description: >-
+            Net BTC held THIS ERA = net credited deposits minus BTC paid out
+            for settled melts, counting only events since the metrics
+            baseline (set by a key rotation). Starts at zero after a
+            rotation.
+        priorEraBtcNetSats:
+          type: integer
+          nullable: true
+          description: >-
+            Pre-rotation ledger net (net credited minus paid out before the
+            current baseline), kept as historical context. Null when no
+            rotation baseline exists.
+        meltPaidCount:
+          type: integer
+        meltPaidSats:
+          type: integer
+          description: Sats paid out across settled melt payouts (frozen at settlement)
+        meltPendingCount:
+          type: integer
+        meltPendingLeks:
+          type: integer
+        meltPendingEstimatedSats:
+          type: integer
+          nullable: true
+          description: Estimated recipient sats owed for pending melts at the current quote
+        meltPendingReserveSats:
+          type: integer
+          nullable: true
+          description: >-
+            Total anticipated treasury debit for pending melts (recipient net
+            plus network fees, i.e. gross minus melt fee) — the figure the
+            reserve requirement uses
+        leksInCirculation:
+          type: integer
+        leksPendingIssuance:
+          type: integer
+          description: Leks issuable from confirmed-but-unissued deposits at the current rate
+        treasuryDust:
+          type: string
+          description: Accumulated dust (decimal string)
+        treasuryDustBySource:
+          type: array
+          items:
+            type: object
+            properties:
+              source:
+                type: string
+              total:
+                type: string
+            required: [source, total]
+        treasury:
+          type: object
+          description: Live on-chain balance across all derived deposit addresses
+          properties:
+            liveBalanceSats:
+              type: integer
+              nullable: true
+            addressCount:
+              type: integer
+              nullable: true
+            fetchedAt:
+              type: string
+              format: date-time
+              nullable: true
+            stale:
+              type: boolean
+              nullable: true
+              description: True when the reading is older than the freshness window
+          required: [liveBalanceSats, addressCount, fetchedAt, stale]
+        audit:
+          type: object
+          description: Solvency reconciliation against the live treasury read
+          properties:
+            expectedReserveSats:
+              type: integer
+              description: Gross credited deposits minus settled payout sats
+            requiredReserveSats:
+              type: integer
+              description: >-
+                Conservative upper bound on sats needed to back circulating
+                leks (valued at the minimum unrevoked epoch rate, since
+                vintage proofs redeem at their own epoch rate) plus pending
+                melts
+            actualBalanceSats:
+              type: integer
+              nullable: true
+            discrepancySats:
+              type: integer
+              nullable: true
+              description: actual minus expected (null when live read unavailable)
+            approximate:
+              type: boolean
+              description: >-
+                True when reconciliation includes legacy payouts whose value
+                was reconstructed at a later quote rather than frozen at
+                settlement
+            ok:
+              type: boolean
+              nullable: true
+              description: True when the live balance covers the required reserve
+          required:
+            [expectedReserveSats, requiredReserveSats, actualBalanceSats, discrepancySats, approximate, ok]
+        metricsBaselineAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: When set, all metrics report activity at/after this key reset
+        dailyMintVolume:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+                format: date
+              amountSats:
+                type: integer
+                description: Net credited sats issued that day
+            required: [date, amountSats]
+        dailyMeltVolume:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+                format: date
+              amountSats:
+                type: integer
+                description: Sats paid out for melts settled that day
+            required: [date, amountSats]
+        dailyBalance:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+                format: date
+              balanceSats:
+                type: integer
+                description: Era BTC balance (net credited minus paid melts) at end of day
+            required: [date, balanceSats]
+      required:
+        - fundedAddresses
+        - mintCount
+        - totalBtcGrossSats
+        - totalBtcNetSats
+        - totalFeesCollectedSats
+        - btcHeldNetSats
+        - priorEraBtcNetSats
+        - meltPaidCount
+        - meltPaidSats
+        - meltPendingCount
+        - meltPendingLeks
+        - meltPendingEstimatedSats
+        - meltPendingReserveSats
+        - leksInCirculation
+        - leksPendingIssuance
+        - treasuryDust
+        - treasuryDustBySource
+        - treasury
+        - audit
+        - metricsBaselineAt
+        - dailyMintVolume
+        - dailyMeltVolume
+        - dailyBalance
+    FeeConfig:
+      type: object
+      properties:
+        fixedFeeSats:
+          type: integer
+        percentageFeeBps:
+          type: integer
+          description: Percentage fee in basis points (100 = 1%)
+        minThresholdSats:
+          type: integer
+          description: Deposits below this amount pay no fee
+        meltFixedFeeSats:
+          type: integer
+          description: Effective flat fee charged on melt payouts, in sats
+        meltPercentageFeeBps:
+          type: integer
+          description: Effective melt percentage fee in basis points (100 = 1%)
+        meltMinThresholdSats:
+          type: integer
+          description: Melt payouts below this amount pay no fee
+        meltConfigured:
+          type: boolean
+          description: >-
+            True when melt fees are explicitly configured; false when they
+            inherit the mint fee values.
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        [
+          fixedFeeSats,
+          percentageFeeBps,
+          minThresholdSats,
+          meltFixedFeeSats,
+          meltPercentageFeeBps,
+          meltMinThresholdSats,
+          meltConfigured,
+          updatedAt,
+        ]
+    FeeConfigInput:
+      type: object
+      description: >-
+        Partial update — only provided fields change. Mint (deposit) and melt
+        fee components can be updated independently.
+      properties:
+        fixedFeeSats:
+          type: integer
+          minimum: 0
+        percentageFeeBps:
+          type: integer
+          minimum: 0
+          maximum: 10000
+        minThresholdSats:
+          type: integer
+          minimum: 0
+        meltFixedFeeSats:
+          type: integer
+          minimum: 0
+          nullable: true
+          description: Set null to inherit the mint fixed fee
+        meltPercentageFeeBps:
+          type: integer
+          minimum: 0
+          maximum: 10000
+          nullable: true
+          description: Set null to inherit the mint percentage fee
+        meltMinThresholdSats:
+          type: integer
+          minimum: 0
+          nullable: true
+          description: Set null to inherit the mint minimum threshold
+    XpubInput:
+      type: object
+      properties:
+        xpub:
+          type: string
+          description: Extended public key (mainnet xpub or zpub)
+      required: [xpub]
+    XpubUpdateResult:
+      type: object
+      properties:
+        accepted:
+          type: boolean
+        derivationPath:
+          type: string
+        nextIndex:
+          type: integer
+        sampleAddresses:
+          type: array
+          description: Next few derived addresses for operator verification
+          items:
+            type: string
+      required: [accepted, derivationPath, nextIndex, sampleAddresses]
+    SocialLinks:
+      type: object
+      properties:
+        contactXUrl:
+          type: string
+          nullable: true
+          description: X (Twitter) profile URL
+        contactNostrUrl:
+          type: string
+          nullable: true
+          description: Nostr profile URL or nprofile link
+        contactEmail:
+          type: string
+          nullable: true
+          description: Contact email address
+      required: [contactXUrl, contactNostrUrl, contactEmail]
+    MintSettings:
+      type: object
+      properties:
+        minConfirmations:
+          type: integer
+        xpubConfigured:
+          type: boolean
+        derivationIndexCounter:
+          type: integer
+        updatedAt:
+          type: string
+          format: date-time
+      required: [minConfirmations, xpubConfigured, derivationIndexCounter, updatedAt]
+    EmailSettings:
+      type: object
+      properties:
+        smtpUser:
+          type: string
+          nullable: true
+        smtpPassSet:
+          type: boolean
+        operatorEmail:
+          type: string
+          nullable: true
+        sources:
+          type: object
+          description: Where each effective value comes from ("db" = admin settings, "env" = Replit secret, null = unset)
+          properties:
+            user:
+              type: string
+              nullable: true
+              enum: [db, env, null]
+            pass:
+              type: string
+              nullable: true
+              enum: [db, env, null]
+            operatorEmail:
+              type: string
+              nullable: true
+              enum: [db, env, null]
+          required: [user, pass, operatorEmail]
+      required: [smtpUser, smtpPassSet, operatorEmail, sources]
+    EmailSettingsInput:
+      type: object
+      description: All fields optional — omitted fields are left unchanged; empty string clears the stored value (falls back to env secret).
+      properties:
+        smtpUser:
+          type: string
+          maxLength: 320
+        smtpPass:
+          type: string
+          maxLength: 1024
+        operatorEmail:
+          type: string
+          maxLength: 320
+    TestEmailResult:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        to:
+          type: string
+      required: [ok, to]
+    MintSettingsInput:
+      type: object
+      properties:
+        minConfirmations:
+          type: integer
+          minimum: 1
+          maximum: 100
+      required: [minConfirmations]
+    AdminKeyset:
+      type: object
+      properties:
+        id:
+          type: string
+        active:
+          type: boolean
+        epochId:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        revokedAt:
+          type: string
+          format: date-time
+          nullable: true
+      required: [id, active, epochId, createdAt, revokedAt]
+    AdminKeysetList:
+      type: object
+      properties:
+        keysets:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminKeyset"
+      required: [keysets]
+    RotateKeysetInput:
+      type: object
+      properties:
+        confirm:
+          type: string
+          description: Must be exactly "ROTATE AND VOID" to proceed
+      required: [confirm]
+    RotateKeysetResult:
+      type: object
+      properties:
+        newKeysetId:
+          type: string
+        revokedKeysetIds:
+          type: array
+          items:
+            type: string
+        rotatedAt:
+          type: string
+          format: date-time
+      required: [newKeysetId, revokedKeysetIds, rotatedAt]
+    RebaseSupplyEraResult:
+      type: object
+      properties:
+        message:
+          type: string
+      required: [message]
+    SupplyLogEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        snapshotAt:
+          type: string
+          format: date-time
+        totalLeksIssued:
+          type: integer
+        totalLeksRedeemed:
+          type: integer
+        btcBalanceSats:
+          type: integer
+      required: [id, snapshotAt, totalLeksIssued, totalLeksRedeemed, btcBalanceSats]
+    SupplyLogResponse:
+      type: object
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/SupplyLogEntry"
+        total:
+          type: integer
+      required: [entries, total]
+    PayoutEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        btcAddress:
+          type: string
+        amountLeks:
+          type: integer
+        status:
+          type: string
+          enum: [pending, paid]
+        createdAt:
+          type: string
+          format: date-time
+        settledAt:
+          type: string
+          format: date-time
+          nullable: true
+        estimatedBtcSats:
+          type: integer
+          nullable: true
+          description: >-
+            For pending rows: the BTC amount (sats, net of expected transfer
+            fees) owed if the batch were prepared right now, at the current
+            epoch rate index. Recomputed on every read — subject to change
+            until the batch settles. Null for paid rows.
+        paidAmountSats:
+          type: integer
+          nullable: true
+          description: Total treasury debit frozen at settlement (recipient net plus network fee). Null for pending rows.
+        paidAmountIsEstimate:
+          type: boolean
+          nullable: true
+          description: True when paidAmountSats is a settlement-time quote rather than a verified on-chain amount. Null for pending rows.
+      required: [id, btcAddress, amountLeks, status, createdAt, settledAt, estimatedBtcSats, paidAmountSats, paidAmountIsEstimate]
+    PayoutsResponse:
+      type: object
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/PayoutEntry"
+        total:
+          type: integer
+          description: Total records matching the status filter
+        pendingCount:
+          type: integer
+          description: Number of pending payouts overall
+        pendingTotalLeks:
+          type: integer
+          description: Sum of pending payout amounts overall
+        rateIndex:
+          type: string
+          nullable: true
+          description: Current epoch rate index used for the BTC estimates (decimal string)
+        pendingTotalEstimatedSats:
+          type: integer
+          nullable: true
+          description: Estimated BTC total (sats, net of expected transfer fees) for all pending payouts at the current rate
+      required: [entries, total, pendingCount, pendingTotalLeks, rateIndex, pendingTotalEstimatedSats]
+    PayoutCorrectionInput:
+      type: object
+      properties:
+        paidAmountSats:
+          type: integer
+          minimum: 0
+          maximum: 2100000000000000
+          description: Actual total sats debited from the treasury for this payout (recipient amount plus network fee)
+      required: [paidAmountSats]
+    PayoutCorrectionResult:
+      type: object
+      properties:
+        id:
+          type: integer
+        paidAmountSats:
+          type: integer
+        paidAmountIsEstimate:
+          type: boolean
+      required: [id, paidAmountSats, paidAmountIsEstimate]
+    PayoutSettleInput:
+      type: object
+      properties:
+        ids:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items:
+            type: integer
+            minimum: 1
+      required: [ids]
+    PayoutSettleResult:
+      type: object
+      properties:
+        settledCount:
+          type: integer
+        settledTotalLeks:
+          type: integer
+      required: [settledCount, settledTotalLeks]
+    SwapRecoverInput:
+      type: object
+      properties:
+        outputs:
+          type: array
+          description: Blinded message points (B_ hex) to look up
+          items:
+            type: string
+            minLength: 1
+          minItems: 1
+          maxItems: 256
+      required: [outputs]
+    SwapRecoveryResult:
+      type: object
+      properties:
+        unit:
+          type: string
+        signatures:
+          type: array
+          description: >-
+            One entry per requested B_, in request order. Null when the mint
+            has no record of that blinded message.
+          items:
+            oneOf:
+              - $ref: "#/components/schemas/BlindSignature"
+              - type: "null"
+      required: [unit, signatures]

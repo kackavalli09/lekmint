@@ -1,0 +1,32 @@
+# SOURCE ONLY: build externally from repository root with this Dockerfile.
+# No Docker build has been run in Replit. No .s9pk is claimed.
+ARG NODE_IMAGE=node:24-bookworm-slim
+FROM ${NODE_IMAGE} AS build
+ARG PNPM_VERSION=10.26.1
+WORKDIR /app
+RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+COPY artifacts/api-server/package.json artifacts/api-server/package.json
+COPY lib/db/package.json lib/db/package.json
+COPY lib/api-zod/package.json lib/api-zod/package.json
+RUN pnpm --filter @workspace/api-server... install --frozen-lockfile
+COPY artifacts/api-server/src artifacts/api-server/src
+COPY artifacts/api-server/assets artifacts/api-server/assets
+COPY artifacts/api-server/build.mjs artifacts/api-server/build.mjs
+COPY lib/db/src lib/db/src
+COPY lib/api-zod/src lib/api-zod/src
+RUN pnpm --filter @workspace/api-server run build
+RUN pnpm --filter @workspace/api-server --prod deploy --legacy /runtime
+RUN cp -a artifacts/api-server/dist /runtime/dist
+
+FROM ${NODE_IMAGE} AS runtime
+ENV NODE_ENV=production PORT=3000 MINT_OPERATION_MODE=standby
+WORKDIR /app
+COPY --from=build --chown=node:node /runtime/ /app/
+COPY ops/startos/api-entrypoint.sh /usr/local/bin/lek-api-entrypoint
+COPY ops/startos/healthcheck.mjs /app/healthcheck.mjs
+USER node
+EXPOSE 3000
+STOPSIGNAL SIGTERM
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 CMD ["node", "/app/healthcheck.mjs", "live"]
+ENTRYPOINT ["/bin/sh", "/usr/local/bin/lek-api-entrypoint"]
