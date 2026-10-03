@@ -1,8 +1,31 @@
 # Lek Mint — StartOS 0.4.0.1 preparation
 
-**Source only, NOT an installable StartOS package.** No `.s9pk`, StartOS install,
-Docker build, durable-volume test, live migration, or Google Drive authorization
-has been performed. No schema, live database, or secret was read/exported.
+**Mint source only, NOT an installable Lek Mint StartOS package.** No mint `.s9pk`,
+mint-container build, StartOS installation, durable-volume test, or live migration
+has been performed. Start9-local Google Drive backup authorization is still pending.
+
+The operator reports a successful external x86_64 build of the official sample
+package, using CLI 1.1.0 and SDK 2.0.9 after removing the dummy default host.
+This is a build-tool smoke test only, not a mint build or device compatibility
+test. The operator also reports high-severity npm warnings; their advisory details
+identify `brace-expansion` and `js-yaml` beneath the SDK's lint dependencies.
+Published SDK 2.0.9 metadata lists ESLint and TypeScript-ESLint as bundled
+dependencies, and 2.0.9 remains the latest published SDK at this check.
+Remediation is not yet applied or verified. Preview changes against the actual
+external dependency tree before updating, then re-audit and rebuild.
+The operator's `npm audit fix --dry-run --ignore-scripts` confirmed that npm
+cannot automatically fix the bundled copies: brace-expansion 1.1.15 and 5.0.6,
+and js-yaml 4.2.0. Do not retry with `--force`, suppress the advisories, or make
+untracked edits to installed files. Resolution requires a patched official SDK
+or a reviewed, reproducible patched SDK artifact, followed by auditing the actual
+resolved dependency tree and rebuilding. The operator approved the reproducible
+patch route; see [sdk-patch/README.md](sdk-patch/README.md) for the recipe,
+verification scope, and remaining external install/audit/rebuild checks.
+Do not install or publish the sample or treat the successful build as security
+clearance.
+
+Application dependency changes and the remaining security/functional gates are
+recorded in [security-verification.md](security-verification.md).
 
 Chosen architecture: Start9 primary API + PostgreSQL 16, Netlify static wallet
 and admin, encrypted Google Drive backups, manually activated Replit recovery.
@@ -37,6 +60,40 @@ moving documentation is **not proof that a particular SDK works on 0.4.0.1**.
 No exact SDK/CLI lock compatible with the user's exact OS has been verified.
 Accordingly this directory intentionally supplies no fabricated SDK manifest,
 unvalidated package exports, image registry URL, or alleged `.s9pk` build.
+
+Official release lookup on 2026-10-01 identified `start-cli/v2.1.0`,
+`start-sdk/v2.0.9`, and the reported `start-os/v0.4.0.1`:
+https://github.com/Start9Labs/start-technologies/releases
+These are research candidates, not an adopted or compatibility-tested toolchain.
+The official `start-os/v0.4.0.1` source tag's package template explicitly
+depends on `@start9labs/start-sdk` `2.0.9`; its CLI Cargo manifest declares
+`1.1.0`. This provides a release-specific starting point, not runtime proof.
+Use the package template's published SDK dependency rather than building the
+monorepo SDK directory, which declares a different development version.
+For external build preparation, select CLI `1.1.0` and SDK `2.0.9` from these
+release-specific references; this does not yet certify their runtime behavior.
+The official CLI `1.1.0` Linux x86_64 release binary's published SHA-256 is
+`70eff67b6e9a936acd8aaaf787b783819252ecedaa5c74d462e3b15ed4dd843a`.
+Verify this checksum before executing it and keep it version-named rather than
+overwriting an unrelated local CLI installation.
+CLI `1.1.0` scaffolds `host.default: https://dev-vm.local` in the build
+workspace's `.startos/config.yaml`. This fictitious default caused even the
+local smoke-build sequence to fail hostname resolution. Before local packaging,
+back up that config and comment out only the exact dummy default entry; do not
+replace it with the real mint/StartOS address. Preserve signing keys and other
+configuration. An empty host namespace is supported by this CLI's config parser.
+CLI `2.0.0` release notes document removal of this scaffolded default, but merely
+upgrading a binary does not remove it from an existing workspace.
+Sources:
+- https://github.com/Start9Labs/start-technologies/blob/start-os/v0.4.0.1/projects/start-sdk/docs/package-template/package.json
+- https://github.com/Start9Labs/start-technologies/blob/start-os/v0.4.0.1/projects/start-cli/Cargo.toml
+- https://github.com/Start9Labs/start-technologies/releases/tag/start-cli/v1.1.0
+
+The 0.4.0.1 release notes explicitly state that the StartOS web interface holds
+ports 80 and 443. Do not blindly forward those ports to the device: first verify
+the mint's service-specific public domain, TLS routing, and that management
+addresses remain inaccessible from outside. Package building and device testing
+remain required before ingress is enabled.
 
 Official architecture names are `x86_64`, `aarch64`, `riscv64`. This workspace's
 pnpm overrides remove ARM/RISC-V esbuild binaries, so only **Linux x86_64 is a

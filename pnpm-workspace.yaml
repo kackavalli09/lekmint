@@ -43,6 +43,10 @@ onlyBuiltDependencies:
   - unrs-resolver
 
 overrides:
+  # Keep the financial API generator stable; latest Orval changes generated validators.
+  # Same-major fixes for vulnerable code-generation dependencies.
+  'brace-expansion@5': 5.0.12
+  'js-yaml@4': 4.3.2
   '@esbuild-kit/esm-loader': npm:tsx@^4.21.0
   '@expo/ngrok-bin>@expo/ngrok-bin-darwin-arm64': '-'
   '@expo/ngrok-bin>@expo/ngrok-bin-darwin-x64': '-'
