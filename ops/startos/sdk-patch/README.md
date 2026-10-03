@@ -80,10 +80,13 @@ input integrity and replacement checks remain required regardless.
   This is not an audit of all dependencies subsequently installed by npm, does
   not establish runtime exploitability, and does not cover container OS packages.
 
-Still required on the operator's PC: install the local archive into the sample,
-audit the complete resolved dependency tree, typecheck, force a new x86_64
-package build, and audit again. No device compatibility, real mint packaging,
-database restoration, public ingress, or production activation is certified.
+The operator subsequently reported a successful forced x86_64 sample rebuild
+using SDK 2.0.9-lek.1 and a final npm audit reporting zero vulnerabilities.
+The output was `lek-build-check_x86_64.s9pk` (4.1M). This is operator-reported
+external verification, not a build executed in this workspace.
+No device compatibility, real mint packaging, database restoration, public
+ingress, or production activation is certified. The sample audit does not
+clear the separate application's dependency findings or container OS packages.
 
 When upstream releases a fix, verify its actual bundled contents, test the
 migration back to the official dependency, and remove this patch deliberately.

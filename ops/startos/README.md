@@ -1,6 +1,8 @@
 # Lek Mint — StartOS 0.4.0.1 preparation
 
-**Mint source only, NOT an installable Lek Mint StartOS package.** No mint `.s9pk`,
+**Build candidate source only, NOT an approved installable release.** The
+[isolated package](package/README.md) now supplies the real API/PostgreSQL
+manifest and standby-only runtime. No mint `.s9pk`,
 mint-container build, StartOS installation, durable-volume test, or live migration
 has been performed. Start9-local Google Drive backup authorization is still pending.
 
@@ -11,8 +13,9 @@ test. The operator also reports high-severity npm warnings; their advisory detai
 identify `brace-expansion` and `js-yaml` beneath the SDK's lint dependencies.
 Published SDK 2.0.9 metadata lists ESLint and TypeScript-ESLint as bundled
 dependencies, and 2.0.9 remains the latest published SDK at this check.
-Remediation is not yet applied or verified. Preview changes against the actual
-external dependency tree before updating, then re-audit and rebuild.
+The operator has now applied the reproducible SDK patch, reported a successful
+sample rebuild with SDK 2.0.9-lek.1, and provided a final npm audit reporting
+zero vulnerabilities. This verifies the sample build, not the real mint package.
 The operator's `npm audit fix --dry-run --ignore-scripts` confirmed that npm
 cannot automatically fix the bundled copies: brace-expansion 1.1.15 and 5.0.6,
 and js-yaml 4.2.0. Do not retry with `--force`, suppress the advisories, or make
@@ -20,7 +23,7 @@ untracked edits to installed files. Resolution requires a patched official SDK
 or a reviewed, reproducible patched SDK artifact, followed by auditing the actual
 resolved dependency tree and rebuilding. The operator approved the reproducible
 patch route; see [sdk-patch/README.md](sdk-patch/README.md) for the recipe,
-verification scope, and remaining external install/audit/rebuild checks.
+verification scope, and external sample build result.
 Do not install or publish the sample or treat the successful build as security
 clearance.
 
@@ -58,8 +61,9 @@ describe `exec.runAsInit` for supervisors; volumes must be mounted explicitly.
 The current guide discusses SDK 2.0 but also shows older beta versions: the
 moving documentation is **not proof that a particular SDK works on 0.4.0.1**.
 No exact SDK/CLI lock compatible with the user's exact OS has been verified.
-Accordingly this directory intentionally supplies no fabricated SDK manifest,
-unvalidated package exports, image registry URL, or alleged `.s9pk` build.
+The isolated candidate now uses the actual patched SDK types and has passed
+typechecking and JavaScript bundling. This does not prove image builds, final
+packaging, or device compatibility; no `.s9pk` build is claimed.
 
 Official release lookup on 2026-10-01 identified `start-cli/v2.1.0`,
 `start-sdk/v2.0.9`, and the reported `start-os/v0.4.0.1`:

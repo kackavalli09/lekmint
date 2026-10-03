@@ -41,9 +41,11 @@ development-only or treat the two original fixes as overall security clearance.
 
 ## Remaining external checks
 
-Follow [the SDK patch guide](sdk-patch/README.md) to apply the reproducible
-archive to the local sample project, audit its complete installed dependency
-tree, force a fresh build, and audit again.
+The operator reports completing [the SDK patch guide](sdk-patch/README.md):
+the forced x86_64 sample build succeeded with SDK 2.0.9-lek.1, producing
+`lek-build-check_x86_64.s9pk` (4.1M), followed by an npm audit reporting zero
+vulnerabilities. This externally reported result clears the sample-build gate
+only; it does not supersede the application's separate dependency findings.
 
 The final mint package, container/OS scans, actual Start9 compatibility,
 isolated restore and transaction tests remain pending. No publishing, device

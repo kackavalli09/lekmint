@@ -4,6 +4,8 @@ set -Eeuo pipefail
 root=$(cd "$(dirname "$0")" && pwd)
 sh -n "$root/api-entrypoint.sh"
 sh -n "$root/postgres-entrypoint.sh"
+sh -n "$root/postgres-healthcheck.sh"
+bash -n "$root/package/build-local.sh"
 node --check "$root/healthcheck.mjs"
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT

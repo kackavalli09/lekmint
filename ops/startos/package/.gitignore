@@ -1,0 +1,4 @@
+node_modules/
+javascript/
+vendor/
+*.s9pk

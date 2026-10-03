@@ -4,6 +4,7 @@ ARG POSTGRES_IMAGE=postgres:16-bookworm
 FROM ${POSTGRES_IMAGE}
 ENV PGDATA=/var/lib/postgresql/data/pgdata
 COPY ops/startos/postgres-entrypoint.sh /usr/local/bin/lek-postgres-entrypoint
+COPY ops/startos/postgres-healthcheck.sh /usr/local/bin/lek-postgres-healthcheck
 STOPSIGNAL SIGINT
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD ["pg_isready", "-h", "127.0.0.1", "-p", "5432"]
 ENTRYPOINT ["/bin/sh", "/usr/local/bin/lek-postgres-entrypoint"]

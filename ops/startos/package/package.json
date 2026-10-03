@@ -1,0 +1,21 @@
+{
+  "name": "lek-mint-lab-startos",
+  "version": "1.1.1",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "check": "tsc --noEmit",
+    "build": "ncc build startos/index.ts -o javascript"
+  },
+  "dependencies": {
+    "@start9labs/start-sdk": "file:vendor/start9labs-start-sdk-2.0.9-lek.1.tgz"
+  },
+  "overrides": {
+    "@start9labs/start-sdk": "$@start9labs/start-sdk"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.0",
+    "@vercel/ncc": "0.38.4",
+    "typescript": "6.0.3"
+  }
+}
