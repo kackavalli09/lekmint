@@ -15,11 +15,11 @@ export const manifest = setupManifest({
   volumes: ['postgres', 'config'],
   images: {
     api: {
-      source: { dockerBuild: { workdir: '../../..', dockerfile: 'ops/startos/Dockerfile.api' } },
+      source: { dockerBuild: { workdir: '../../..', dockerfile: '../Dockerfile.api' } },
       arch: ['x86_64'],
     },
     postgres: {
-      source: { dockerBuild: { workdir: '../../..', dockerfile: 'ops/startos/Dockerfile.postgres' } },
+      source: { dockerBuild: { workdir: '../../..', dockerfile: '../Dockerfile.postgres' } },
       arch: ['x86_64'],
     },
   },

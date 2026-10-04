@@ -22,7 +22,10 @@ test('package identity and image architecture cannot replace the live mint', () 
   for (const image of Object.values(pkg.manifest.images)) {
     assert.deepEqual(image.arch, ['x86_64'])
     const build = image.source.dockerBuild
-    assert.ok(fs.existsSync(path.resolve(__dirname, build.workdir, build.dockerfile)))
+    // CLI 1.1.0 passes `build <workdir> -f <dockerfile>` without chdir:
+    // both paths are relative to the package, not to each other.
+    assert.ok(fs.existsSync(path.resolve(__dirname, build.workdir, 'pnpm-lock.yaml')))
+    assert.ok(fs.existsSync(path.resolve(__dirname, build.dockerfile)))
   }
 })
 test('native backup refuses rather than copying a live database', async () => {
