@@ -2,6 +2,8 @@
 SHELL := /bin/bash
 .PHONY: x86 check
 check:
+	test -d assets
+	test -f icon.svg && test -f LICENSE && test -f instructions.md
 	npm run check
 	npm audit
 x86: check

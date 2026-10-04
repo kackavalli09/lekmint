@@ -5,6 +5,15 @@ const fs = require('node:fs')
 const path = require('node:path')
 const pkg = require('./javascript/index.js')
 
+test('default CLI package inputs are present before image builds', () => {
+  for (const name of ['icon.svg', 'LICENSE', 'instructions.md', 'javascript/index.js']) {
+    assert.ok(fs.statSync(path.join(__dirname, name)).isFile(), name)
+  }
+  assert.ok(fs.statSync(path.join(__dirname, 'assets')).isDirectory())
+  assert.ok(fs.existsSync(path.join(__dirname, 'assets/README.md')),
+    'Track a file so the required directory survives a checkout or ZIP export')
+})
+
 test('external lockfile has portable URLs and integrity for every download', () => {
   const lock = JSON.parse(fs.readFileSync(path.join(__dirname, 'package-lock.json'), 'utf8'))
   for (const item of Object.values(lock.packages)) {
