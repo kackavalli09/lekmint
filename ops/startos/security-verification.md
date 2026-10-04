@@ -47,6 +47,11 @@ the forced x86_64 sample build succeeded with SDK 2.0.9-lek.1, producing
 vulnerabilities. This externally reported result clears the sample-build gate
 only; it does not supersede the application's separate dependency findings.
 
-The final mint package, container/OS scans, actual Start9 compatibility,
-isolated restore and transaction tests remain pending. No publishing, device
-installation, DNS change, or mint activation is authorized by this document.
+The operator subsequently reported a successful real API/PostgreSQL isolated
+package build and a clean final package-tooling npm audit; see
+[the build record](package/BUILD-RECORD.md). This does not clear application
+runtime dependencies or image OS packages.
+
+Container/OS scans, actual Start9 compatibility, isolated restore and
+transaction tests remain pending. No publishing, device installation, DNS
+change, or mint activation is authorized by this document.

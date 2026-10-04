@@ -15,8 +15,10 @@ the moving template. TypeScript checks and the JavaScript bundle build passed.
 The package tooling's complete npm audit reported zero vulnerabilities.
 Contract/refusal tests exercise the compiled exports and configuration.
 
-Docker builds, final `.s9pk` packaging and real-device operation have **not**
-been run here. The application's separate dependency findings are unresolved.
+The operator reports a successful external Docker/image and `.s9pk` build;
+see [BUILD-RECORD.md](BUILD-RECORD.md) for the supplied manifest and checksum.
+These builds were not run in this workspace, and real-device operation remains
+untested. The application's separate dependency findings are unresolved.
 Base images still use major-version tags for preparation; pin digests and scan
 the finished images before a production candidate. No production cutover,
 automatic backup configuration or activation is included.

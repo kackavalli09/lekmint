@@ -2,9 +2,10 @@
 
 **Build candidate source only, NOT an approved installable release.** The
 [isolated package](package/README.md) now supplies the real API/PostgreSQL
-manifest and standby-only runtime. No mint `.s9pk`,
-mint-container build, StartOS installation, durable-volume test, or live migration
-has been performed. Start9-local Google Drive backup authorization is still pending.
+manifest and standby-only runtime. The operator reports a successful external
+image/package build; see [the build record](package/BUILD-RECORD.md).
+No StartOS installation, durable-volume test, or live migration has been
+performed. Start9-local Google Drive backup authorization is still pending.
 
 The operator reports a successful external x86_64 build of the official sample
 package, using CLI 1.1.0 and SDK 2.0.9 after removing the dummy default host.
