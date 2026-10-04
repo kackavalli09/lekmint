@@ -8,6 +8,8 @@ RUN git clone https://github.com/tianon/gosu.git /src \
     && CGO_ENABLED=0 go build -mod=readonly -trimpath -o /gosu . \
     && go version -m /gosu
 FROM ${POSTGRES_IMAGE}
+COPY ops/startos/update-pcre2.sh /tmp/lek-update-pcre2.sh
+RUN sh /tmp/lek-update-pcre2.sh && rm /tmp/lek-update-pcre2.sh
 COPY --from=gosu-build /gosu /usr/local/bin/gosu
 RUN gosu --version && test "$(gosu postgres id -u)" = "$(id -u postgres)"
 ENV PGDATA=/var/lib/postgresql/data/pgdata
