@@ -62,10 +62,15 @@ are absent or dismissing build-time risks.
 
 No dependency versions or application behavior were changed during this review.
 
-## Image review remains pending
+## Image review follow-up
 
-The reported `.s9pk` is on the operator's PC. Its exact image contents have not
-been scanned here. The release-tagged packer exports container filesystems into
+The operator subsequently supplied complete API/PostgreSQL packaged-filesystem
+reports. See [the image-scan review](IMAGE-SCAN-REVIEW.md) for verified counts,
+dependency locations and the remaining remediation/applicability work. The
+following describes the scan provenance approach, not a still-pending scan.
+
+The reported `.s9pk` is on the operator's PC. Its extracted contents were scanned
+there, not executed here. The release-tagged packer exports container filesystems into
 packaged SquashFS files and removes temporary Docker image tags afterward.
 An empty local image listing is therefore not evidence of a failed build.
 Inspect the package file tree and extract the actual embedded filesystems for
@@ -84,5 +89,5 @@ not prove which image bytes are embedded in the package.
 ## Decision
 
 Version-field concern resolved at source level. Security review is **not clear**:
-runtime dependency findings and built-image scans remain outstanding. Keep the
+runtime dependency remediation and image-finding applicability remain outstanding. Keep the
 candidate uninstalled and in standby; no live migration or activation approval.

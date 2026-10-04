@@ -52,6 +52,8 @@ package build and a clean final package-tooling npm audit; see
 [the build record](package/BUILD-RECORD.md). This does not clear application
 runtime dependencies or image OS packages.
 
-Container/OS scans, actual Start9 compatibility, isolated restore and
+The operator has now supplied container-filesystem/OS scans; see the
+[image-scan review](package/IMAGE-SCAN-REVIEW.md). Security remediation and
+applicability review, actual Start9 operation, isolated restore and
 transaction tests remain pending. No publishing, device installation, DNS
 change, or mint activation is authorized by this document.
