@@ -7,6 +7,6 @@
     "monitor": "node run.mjs"
   },
   "dependencies": {
-    "nodemailer": "9.0.5"
+    "nodemailer": "10.0.13"
   }
 }

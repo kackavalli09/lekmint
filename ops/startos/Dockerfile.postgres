@@ -1,7 +1,15 @@
 # SOURCE ONLY. Never mount SQL into /docker-entrypoint-initdb.d.
 # postgres-entrypoint refuses to initialize PGDATA on normal startup.
 ARG POSTGRES_IMAGE=postgres:16-bookworm
+FROM golang:1.26.8-bookworm AS gosu-build
+# Preserve gosu 1.19's behavior; rebuild its pinned source with a patched Go runtime.
+RUN git clone https://github.com/tianon/gosu.git /src \
+    && cd /src && git checkout 6456aaa0f3c854d199d0f037f068eb97515b7513 \
+    && CGO_ENABLED=0 go build -mod=readonly -trimpath -o /gosu . \
+    && go version -m /gosu
 FROM ${POSTGRES_IMAGE}
+COPY --from=gosu-build /gosu /usr/local/bin/gosu
+RUN gosu --version && test "$(gosu postgres id -u)" = "$(id -u postgres)"
 ENV PGDATA=/var/lib/postgresql/data/pgdata
 COPY ops/startos/postgres-entrypoint.sh /usr/local/bin/lek-postgres-entrypoint
 COPY ops/startos/postgres-healthcheck.sh /usr/local/bin/lek-postgres-healthcheck

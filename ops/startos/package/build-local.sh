@@ -11,6 +11,14 @@ start-cli --version | grep -Eq '(^|[[:space:]])1\.1\.0($|[[:space:]])' || {
   echo "Use the previously checksum-verified Start9 CLI 1.1.0 shim." >&2; exit 1;
 }
 docker info >/dev/null
+# Refresh the explicitly selected image families; do not reuse stale local bases.
+# Record immutable identities alongside the new package for review.
+for image in node:24-bookworm-slim postgres:16-bookworm golang:1.26.8-bookworm; do
+  docker pull "$image"
+done
+docker image inspect --format '{{.Id}} {{json .RepoDigests}}' \
+  node:24-bookworm-slim postgres:16-bookworm golang:1.26.8-bookworm \
+  | tee build-base-images.txt
 python3 ../sdk-patch/prepare.py --output-dir "$here/vendor"
 npm ci --ignore-scripts
 npm audit

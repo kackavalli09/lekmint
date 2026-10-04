@@ -20,6 +20,11 @@ RUN pnpm --filter @workspace/api-server --prod deploy --legacy /runtime
 RUN cp -a artifacts/api-server/dist /runtime/dist
 
 FROM ${NODE_IMAGE} AS runtime
+# The service executes Node directly; do not ship npm's independent dependency tree.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
+    && rm -f /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
+      /usr/local/bin/pnpm /usr/local/bin/pnpx /usr/local/bin/yarn /usr/local/bin/yarnpkg \
+    && node --version
 ENV NODE_ENV=production PORT=3000 MINT_OPERATION_MODE=standby
 WORKDIR /app
 COPY --from=build --chown=node:node /runtime/ /app/
