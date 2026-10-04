@@ -65,13 +65,18 @@ No dependency versions or application behavior were changed during this review.
 ## Image review remains pending
 
 The reported `.s9pk` is on the operator's PC. Its exact image contents have not
-been scanned here. First collect local API/PostgreSQL image IDs and scanner
-availability, then scan the relevant built images including OS and language
-packages, recording image IDs, scanner/database versions and complete reports.
+been scanned here. The release-tagged packer exports container filesystems into
+packaged SquashFS files and removes temporary Docker image tags afterward.
+An empty local image listing is therefore not evidence of a failed build.
+Inspect the package file tree and extract the actual embedded filesystems for
+OS and language-package scanning, recording the package and filesystem hashes,
+scanner/database versions and complete reports. Verify the installed CLI's
+inspection syntax and local extraction/scanner availability first.
 Do not scan only base tags, select a random old build, upload private images,
 mount production state or start the application to perform an image scan.
 
-Retain the package SHA-256 from BUILD-RECORD.md. Multiple local build tags may
+Retain the package SHA-256 from BUILD-RECORD.md. If cached Docker images are used
+as supplementary evidence, multiple local build tags may
 refer to identical image IDs; account for all candidates if the exact packaged
 image mapping cannot be established. A locally cached image listing alone does
 not prove which image bytes are embedded in the package.
