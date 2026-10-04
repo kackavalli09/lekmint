@@ -5,6 +5,16 @@ const fs = require('node:fs')
 const path = require('node:path')
 const pkg = require('./javascript/index.js')
 
+test('external lockfile has portable URLs and integrity for every download', () => {
+  const lock = JSON.parse(fs.readFileSync(path.join(__dirname, 'package-lock.json'), 'utf8'))
+  for (const item of Object.values(lock.packages)) {
+    if (!item.resolved) continue
+    assert.ok(item.resolved.startsWith('https://registry.npmjs.org/') ||
+      item.resolved === 'file:vendor/start9labs-start-sdk-2.0.9-lek.1.tgz')
+    assert.ok(item.integrity, 'Download must retain integrity verification')
+  }
+})
+
 test('package identity and image architecture cannot replace the live mint', () => {
   assert.equal(pkg.manifest.id, 'lek-mint-lab')
   assert.equal(pkg.manifest.sdkVersion, '2.0.9-lek.1')
